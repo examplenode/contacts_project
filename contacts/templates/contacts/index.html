@@ -1,73 +1,79 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Контакты</title>
-    <link rel="stylesheet" href="{% static 'contacts/css/style.css' %}">
-</head>
-<body>
-<h1>Контакты</h1>
+{% extends "contacts/base.html" %}
+{% block title %}Контакты - главная{% endblock %}
+{% block content %}
+<h1 class="mb-4">Контакты</h1>
+<section class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5">Добавить контакт</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
 
+            <div class="mb-3">
+                <label class="form-label">Куда сохранить:</label>
+                <select name="storage" class="form-select">
+                    <option value="file">Файл (JSON/XML)</option>
+                    <option value="db">База данных</option>
+                </select>
+            </div>
 
-{% if messages %}
-    <ul class="messages">
-        {% for m in messages %}
-            <li class="{{ m.tags }}">{{ m }}</li>
-        {% endfor %}
-    </ul>
-{% endif %}
+            <div class="mb-3">
+                <label class="form-label">Формат (для файла):</label>
+                <select name="format" class="form-select">
+                    <option value="json">JSON</option>
+                    <option value="xml">XML</option>
+                </select>
+            </div>
 
-<section>
-    <h2>Добавить контакт</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <label>Формат:
-            <select name="format">
-                <option value="json">JSON</option>
-                <option value="xml">XML</option>
-            </select>
-        </label>
-        <button type="submit" name="add_contact" value="1">Сохранить</button>
-    </form>
+            <button type="submit" name="add_contact" value="1" class="btn btn-primary">Сохранить</button>
+        </form>
+    </div>
 </section>
 
-<section>
-    <h2>Загрузить файл</h2>
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <input type="file" name="data_file" accept=".json,.xml">
-        <button type="submit" name="upload_file" value="1">Загрузить</button>
-    </form>
+<section class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5">Загрузить файл</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="file" name="data_file" accept=".json,.xml" class="form-control mb-2">
+            <button type="submit" name="upload_file" value="1" class="btn btn-secondary">Загрузить</button>
+        </form>
+    </div>
 </section>
 
-<section>
-    <h2>Загруженные файлы</h2>
-    {% if not has_files %}
-        <p class="empty">Файлов пока нет.</p>
-    {% else %}
-        {% for f in files_data %}
-            <article class="file">
-                <h3>{{ f.filename }} <small>({{ f.format }})</small></h3>
-                {% if f.error %}
-                    <p class="error">Ошибка: {{ f.error }}</p>
-                {% else %}
-                    <table>
-                        <tr><th>Имя</th><th>Телефон</th><th>Email</th><th>Категория</th></tr>
-                        {% for c in f.contacts %}
-                            <tr>
-                                <td>{{ c.name }}</td>
-                                <td>{{ c.phone }}</td>
-                                <td>{{ c.email }}</td>
-                                <td>{{ c.category }}</td>
-                            </tr>
-                        {% endfor %}
-                    </table>
-                {% endif %}
-            </article>
-        {% endfor %}
-    {% endif %}
+<section class="card">
+    <div class="card-body">
+        <h2 class="h5">Файлы</h2>
+        {% if not has_files %}
+            <p class="text-muted">Файлов пока нет.</p>
+        {% else %}
+            {% for f in files_data %}
+                <article class="mb-3 p-3 border-start border-4 border-primary">
+                    <h3 class="h6">{{ f.filename }} <small class="text-muted">({{ f.format }})</small></h3>
+                    {% if f.error %}
+                        <p class="text-danger">Ошибка: {{ f.error }}</p>
+                    {% else %}
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                <tr><th>Имя</th><th>Телефон</th><th>Email</th><th>Категория</th></tr>
+                                </thead>
+                                <tbody>
+                                {% for c in f.contacts %}
+                                    <tr>
+                                        <td>{{ c.name }}</td>
+                                        <td>{{ c.phone }}</td>
+                                        <td>{{ c.email }}</td>
+                                        <td>{{ c.category }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                </article>
+            {% endfor %}
+        {% endif %}
+    </div>
 </section>
-</body>
-</html>
+{% endblock %}

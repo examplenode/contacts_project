@@ -7,8 +7,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from django.core.files.storage import FileSystemStorage
-
 from .forms import ContactForm
+from django.db.models import Q
+
+from django.db import IntegrityError
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.http import require_POST
+from .models import Contact
+from .forms import ContactModelForm
 
 DATA_DIR = os.path.join(settings.BASE_DIR, "contacts", "data")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -16,14 +23,15 @@ os.makedirs(DATA_DIR, exist_ok=True)
 ALLOWED_EXT = {".json", ".xml"}
 MAX_SIZE = 1 * 1024 * 1024   # 1 МБ
 
-def safe_filename(ext):
-    return f"{uuid.uuid4().hex}{ext}"
-
 REQUIRED_FIELDS = {"name", "phone", "email", "category"}
+
+def safe_filename(ext):
+    """Генерирует безопасное уникальное имя файла (не доверяем имени от пользователя)."""
+    return f"{uuid.uuid4().hex}{ext}"
 
 
 def validate_contacts(data):
-    """Проверяет, что data список словарей с нужными полями."""
+    """Проверяет, что data — список словарей с нужными полями."""
     if not isinstance(data, list):
         return False, "Корневой элемент должен быть списком контактов"
     for i, item in enumerate(data, 1):
@@ -36,9 +44,11 @@ def validate_contacts(data):
             return False, f"В контакте #{i} пустые поля"
     return True, ""
 
+
 def save_json(path, contacts):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(contacts, f, ensure_ascii=False, indent=2)
+
 
 def save_xml(path, contacts):
     root = ET.Element("contacts")
@@ -51,9 +61,11 @@ def save_xml(path, contacts):
     with open(path, "wb") as f:
         f.write(pretty)
 
+
 def read_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
 
 def read_xml(path):
     tree = ET.parse(path)
@@ -69,21 +81,36 @@ def read_xml(path):
     return contacts
 
 def index(request):
-    form = ContactForm()
+    form = ContactForm()              
+    db_form = ContactModelForm()      
+
     if request.method == "POST" and "add_contact" in request.POST:
+        storage = request.POST.get("storage", "file")
+
+        if storage == "db":
+            db_form = ContactModelForm(request.POST)
+            if db_form.is_valid():
+                try:
+                    db_form.save()
+                    messages.success(request, "Контакт добавлен в БД")
+                except IntegrityError:
+                    messages.error(request, "Такой контакт уже есть в БД")
+            else:
+                messages.error(request, "Исправьте ошибки формы БД")
+            return redirect("index")
+
         form = ContactForm(request.POST)
         if form.is_valid():
             contact = form.cleaned_data
             fmt = request.POST.get("format", "json")
             ext = ".json" if fmt == "json" else ".xml"
             path = os.path.join(DATA_DIR, safe_filename(ext))
-
             try:
                 if fmt == "json":
                     save_json(path, [contact])
                 else:
                     save_xml(path, [contact])
-                messages.success(request, f"Контакт сохранён ({fmt.upper()})")
+                messages.success(request, f"Контакт сохранён в файл ({fmt.upper()})")
             except Exception as e:
                 messages.error(request, f"Ошибка сохранения: {e}")
             return redirect("index")
@@ -115,11 +142,10 @@ def index(request):
                     ok, err = False, f"Ошибка разбора: {e}"
 
                 if not ok:
-                    os.remove(full_path)     
+                    os.remove(full_path)
                     messages.error(request, f"Файл невалиден: {err}")
                 else:
                     messages.success(request, f"Файл {ext} загружен")
-
         return redirect("index")
 
     files_data = []
@@ -150,6 +176,67 @@ def index(request):
 
     return render(request, "contacts/index.html", {
         "form": form,
+        "db_form": db_form,
         "files_data": files_data,
         "has_files": bool(files_data),
     })
+
+def db_list(request):
+    query = request.GET.get("q", "").strip()
+    contacts = Contact.objects.all().order_by("-created_at")
+    if query:
+        contacts = contacts.filter(
+            Q(name__icontains=query) |
+            Q(email__icontains=query) |
+            Q(phone__icontains=query)
+        )
+    return render(request, "contacts/db_list.html", {
+        "contacts": contacts,
+        "query": query,
+    })
+
+def ajax_search(request):
+    query = request.GET.get("q", "").strip()
+    qs = Contact.objects.all()
+    if query:
+        qs = qs.filter(
+            Q(name__icontains=query) |
+            Q(email__icontains=query) |
+            Q(phone__icontains=query)
+        )
+    data = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "phone": c.phone,
+            "email": c.email,
+            "category": c.category,
+        }
+        for c in qs[:50]
+    ]
+    return JsonResponse({"results": data})
+
+
+def edit_contact(request, pk):
+    contact = get_object_or_404(Contact, pk=pk)
+    if request.method == "POST":
+        form = ContactModelForm(request.POST, instance=contact)
+        if form.is_valid():
+            try:
+                form.save()
+                messages.success(request, "Контакт обновлён")
+                return redirect("db_list")
+            except IntegrityError:
+                messages.error(request, "Такой контакт уже существует")
+        else:
+            messages.error(request, "Исправьте ошибки формы")
+    else:
+        form = ContactModelForm(instance=contact)
+    return render(request, "contacts/edit.html", {"form": form, "contact": contact})
+
+@require_POST
+def delete_contact(request, pk):
+    contact = get_object_or_404(Contact, pk=pk)
+    contact.delete()
+    messages.success(request, "Контакт удалён")
+    return redirect("db_list")
