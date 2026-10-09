@@ -1,0 +1,31 @@
+{% if contacts %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-primary">
+        <tr>
+            <th>Имя</th><th>Телефон</th><th>Email</th><th>Категория</th><th>Действия</th>
+        </tr>
+        </thead>
+        <tbody id="contacts-body">
+        {% for c in contacts %}
+            <tr>
+                <td>{{ c.name }}</td>
+                <td>{{ c.phone }}</td>
+                <td>{{ c.email }}</td>
+                <td>{{ c.category }}</td>
+                <td>
+                    <a href="{% url 'edit_contact' c.id %}" class="btn btn-sm btn-warning">Редактировать</a>
+                    <form method="post" action="{% url 'delete_contact' c.id %}" class="d-inline"
+                          onsubmit="return confirm('Удалить контакт?');">
+                        {% csrf_token %}
+                        <button class="btn btn-sm btn-danger">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted">Контактов нет.</p>
+{% endif %}
