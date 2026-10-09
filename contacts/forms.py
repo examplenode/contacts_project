@@ -1,5 +1,6 @@
 import re
 from django import forms
+from .models import Contact
 
 class ContactForm(forms.Form):
     name = forms.CharField(max_length=100, label="Имя")
@@ -11,13 +12,25 @@ class ContactForm(forms.Form):
     )
     def clean_phone(self):
         phone = self.cleaned_data["phone"].strip()
-        # допускаем цифры, пробелы, +, -, (, )
         if not re.match(r"^\+?[\d\s\-()]{7,20}$", phone):
             raise forms.ValidationError("Некорректный номер телефона")
         return phone
-
     def clean_name(self):
         name = self.cleaned_data["name"].strip()
         if len(name) < 2:
             raise forms.ValidationError("Имя слишком короткое")
         return name
+    class ContactModelForm(forms.ModelForm):
+        class Meta:
+            model = Contact
+            fields = ["name", "phone", "email", "category"]
+            def clean_phone(self):
+                phone = self.cleaned_data["phone"].strip()
+                if not re.match(r"^\+?[\d\s\-()]{7,20}$", phone):
+                    raise forms.ValidationError("Некорректный номер телефона")
+                return phone
+            def clean_name(self):
+                name = self.cleaned_data["name"].strip()
+                if len(name) < 2:
+                    raise forms.ValidationError("Имя слишком короткое")
+                return name
