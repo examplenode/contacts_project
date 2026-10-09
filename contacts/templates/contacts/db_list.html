@@ -1,0 +1,17 @@
+{% extends "contacts/base.html" %}
+{% load static %}
+{% block title %}Контакты из БД{% endblock %}
+{% block content %}
+<h1 class="mb-4">Контакты из базы данных</h1>
+
+<div class="mb-3">
+    <input type="text" id="search-input" class="form-control"
+           placeholder="Поиск по имени, email или телефону...">
+</div>
+<div id="contacts-table">
+    {% include "contacts/_db_table.html" %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'contacts/js/search.js' %}"></script>
+{% endblock %}
