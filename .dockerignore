@@ -1,0 +1,12 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.sqlite3
+.env
+.venv
+venv/
+staticfiles/
+contacts/data/*.json
+contacts/data/*.xml
